@@ -17,6 +17,10 @@ from schemas import (
 from xml_generator import generate_grandstream_xml
 from carddav_client import CardDAVClient
 from sync_scheduler import start_scheduler, stop_scheduler, update_scheduler
+from migrations import migrate_database
+
+# Run database migrations
+migrate_database()
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
