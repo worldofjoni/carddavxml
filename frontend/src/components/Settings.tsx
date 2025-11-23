@@ -1,0 +1,290 @@
+import React, { useEffect, useState } from 'react';
+import {
+  getSettings,
+  updateSettings,
+  syncCardDAV,
+  testCardDAVConnection,
+  Settings as SettingsType,
+} from '../services/api';
+import './Settings.css';
+
+const Settings: React.FC = () => {
+  const [settings, setSettings] = useState<SettingsType>({
+    carddav_url: '',
+    carddav_username: '',
+    carddav_password: '',
+    sync_enabled: false,
+    auto_sync_interval: 3600,
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [clearExisting, setClearExisting] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const data = await getSettings();
+      setSettings(data);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load settings');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    try {
+      setSaving(true);
+      await updateSettings(settings);
+      setSuccess('Settings saved successfully');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to save settings');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setError(null);
+    setSuccess(null);
+
+    try {
+      setTesting(true);
+      const result = await testCardDAVConnection({
+        carddav_url: settings.carddav_url,
+        carddav_username: settings.carddav_username,
+        carddav_password: settings.carddav_password,
+        clear_existing: false,
+      });
+      setSuccess(result.message);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Connection test failed');
+      console.error(err);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSync = async () => {
+    if (clearExisting && !window.confirm('This will delete all existing contacts. Are you sure?')) {
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+
+    try {
+      setSyncing(true);
+      const result = await syncCardDAV({
+        carddav_url: settings.carddav_url,
+        carddav_username: settings.carddav_username,
+        carddav_password: settings.carddav_password,
+        clear_existing: clearExisting,
+      });
+      setSuccess(result.message);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Sync failed');
+      console.error(err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setSettings(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : (type === 'number' ? parseInt(value) : value),
+    }));
+  };
+
+  if (loading) {
+    return <div className="loading">Loading settings...</div>;
+  }
+
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h2 className="page-title">Settings</h2>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
+
+      {/* XML Phonebook Info */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">XML Phonebook URL</h3>
+        <div className="phonebook-url-card">
+          <p>Configure your Grandstream phone to use this URL for the phonebook:</p>
+          <div className="url-display">
+            <code>{apiUrl}/phonebook.xml</code>
+            <button
+              className="btn btn-secondary btn-small"
+              onClick={() => {
+                navigator.clipboard.writeText(`${apiUrl}/phonebook.xml`);
+                setSuccess('URL copied to clipboard!');
+                setTimeout(() => setSuccess(null), 3000);
+              }}
+            >
+              Copy
+            </button>
+          </div>
+          <p className="url-help">
+            <a href={`${apiUrl}/phonebook.xml`} target="_blank" rel="noopener noreferrer">
+              Open XML Phonebook
+            </a>
+          </p>
+        </div>
+      </div>
+
+      {/* CardDAV Settings */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">CardDAV Server Configuration</h3>
+
+        <form onSubmit={handleSubmit} className="settings-form">
+          <div className="form-group">
+            <label htmlFor="carddav_url">CardDAV Server URL</label>
+            <input
+              type="url"
+              id="carddav_url"
+              name="carddav_url"
+              value={settings.carddav_url}
+              onChange={handleChange}
+              placeholder="https://carddav.example.com/addressbooks/user/"
+            />
+            <small className="form-help">
+              Enter the full CardDAV URL including the path to your address book
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="carddav_username">Username</label>
+            <input
+              type="text"
+              id="carddav_username"
+              name="carddav_username"
+              value={settings.carddav_username}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="carddav_password">Password</label>
+            <input
+              type="password"
+              id="carddav_password"
+              name="carddav_password"
+              value={settings.carddav_password}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              className="btn btn-secondary"
+              disabled={testing || !settings.carddav_url}
+            >
+              {testing ? 'Testing...' : 'Test Connection'}
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Sync Controls */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">Sync Contacts from CardDAV</h3>
+
+        <div className="sync-controls">
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={clearExisting}
+                onChange={(e) => setClearExisting(e.target.checked)}
+              />
+              Clear existing contacts before sync
+            </label>
+            <small className="form-help warning">
+              Warning: This will delete all current contacts in the database
+            </small>
+          </div>
+
+          <button
+            onClick={handleSync}
+            className="btn btn-success"
+            disabled={syncing || !settings.carddav_url}
+          >
+            {syncing ? 'Syncing...' : 'Sync Now'}
+          </button>
+        </div>
+      </div>
+
+      {/* Instructions */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">Setup Instructions</h3>
+        <div className="instructions">
+          <ol>
+            <li>
+              <strong>Configure CardDAV Server:</strong> Enter your CardDAV server URL,
+              username, and password above. Click "Test Connection" to verify the settings.
+            </li>
+            <li>
+              <strong>Sync Contacts:</strong> Click "Sync Now" to import contacts from your
+              CardDAV server. You can choose to clear existing contacts first.
+            </li>
+            <li>
+              <strong>Configure Grandstream Phone:</strong> Go to your phone's web interface,
+              navigate to Phonebook settings, and add a new XML phonebook entry using the URL shown above.
+            </li>
+            <li>
+              <strong>Manual Entry:</strong> You can also manually add, edit, and delete contacts
+              using the Contacts page.
+            </li>
+          </ol>
+
+          <div className="info-box">
+            <h4>Supported CardDAV Servers:</h4>
+            <ul>
+              <li>Nextcloud</li>
+              <li>iCloud</li>
+              <li>Google Contacts (via CardDAV)</li>
+              <li>Synology CardDAV Server</li>
+              <li>Radicale</li>
+              <li>Baïkal</li>
+              <li>Any standard CardDAV-compliant server</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Settings;
