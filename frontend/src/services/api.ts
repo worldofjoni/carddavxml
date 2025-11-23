@@ -75,6 +75,14 @@ export interface CardDAVSync {
   carddav_username: string;
   carddav_password: string;
   clear_existing: boolean;
+  verify_ssl: boolean;
+}
+
+export interface CardDAVDebug {
+  carddav_url: string;
+  carddav_username: string;
+  carddav_password: string;
+  verify_ssl: boolean;
 }
 
 // Contact API
@@ -136,6 +144,11 @@ export const syncCardDAV = async (syncData: CardDAVSync): Promise<{ message: str
 
 export const testCardDAVConnection = async (syncData: CardDAVSync): Promise<{ message: string; status: string }> => {
   const response = await api.post('/api/sync/test', syncData);
+  return response.data;
+};
+
+export const debugCardDAVConnection = async (debugData: CardDAVDebug): Promise<any> => {
+  const response = await api.post('/api/sync/debug', debugData);
   return response.data;
 };
 

@@ -11,7 +11,7 @@ from schemas import (
     ContactCreate, ContactUpdate, ContactResponse,
     ContactGroupCreate, ContactGroupResponse,
     SettingsCreate, SettingsResponse,
-    CardDAVSync
+    CardDAVSync, CardDAVDebug
 )
 from xml_generator import generate_grandstream_xml
 from carddav_client import CardDAVClient
@@ -161,7 +161,8 @@ async def sync_carddav(sync_data: CardDAVSync, db: Session = Depends(get_db)):
         client = CardDAVClient(
             url=sync_data.carddav_url,
             username=sync_data.carddav_username,
-            password=sync_data.carddav_password
+            password=sync_data.carddav_password,
+            verify_ssl=sync_data.verify_ssl
         )
 
         contacts = client.fetch_contacts()
@@ -194,7 +195,8 @@ async def test_carddav_connection(sync_data: CardDAVSync):
         client = CardDAVClient(
             url=sync_data.carddav_url,
             username=sync_data.carddav_username,
-            password=sync_data.carddav_password
+            password=sync_data.carddav_password,
+            verify_ssl=sync_data.verify_ssl
         )
 
         # Try to connect
@@ -204,6 +206,126 @@ async def test_carddav_connection(sync_data: CardDAVSync):
     except Exception as e:
         logger.error(f"CardDAV connection test error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
+
+@app.post("/api/sync/debug")
+async def debug_carddav_connection(debug_data: CardDAVDebug):
+    """Debug CardDAV connection with detailed diagnostics"""
+    import requests
+    from requests.auth import HTTPBasicAuth
+
+    results = {
+        "url": debug_data.carddav_url,
+        "username": debug_data.carddav_username,
+        "verify_ssl": debug_data.verify_ssl,
+        "tests": []
+    }
+
+    # Test 1: Basic HTTP connectivity
+    try:
+        response = requests.get(
+            debug_data.carddav_url,
+            auth=HTTPBasicAuth(debug_data.carddav_username, debug_data.carddav_password),
+            timeout=10,
+            verify=debug_data.verify_ssl
+        )
+        results["tests"].append({
+            "name": "HTTP Connectivity",
+            "status": "success",
+            "details": {
+                "status_code": response.status_code,
+                "server": response.headers.get('Server', 'Unknown'),
+                "dav_header": response.headers.get('DAV', 'Not present')
+            }
+        })
+    except Exception as e:
+        results["tests"].append({
+            "name": "HTTP Connectivity",
+            "status": "failed",
+            "error": str(e)
+        })
+
+    # Test 2: DAV OPTIONS
+    try:
+        response = requests.request(
+            'OPTIONS',
+            debug_data.carddav_url,
+            auth=HTTPBasicAuth(debug_data.carddav_username, debug_data.carddav_password),
+            timeout=10,
+            verify=debug_data.verify_ssl
+        )
+        results["tests"].append({
+            "name": "DAV OPTIONS",
+            "status": "success",
+            "details": {
+                "status_code": response.status_code,
+                "allow": response.headers.get('Allow', 'Not present'),
+                "dav": response.headers.get('DAV', 'Not present')
+            }
+        })
+    except Exception as e:
+        results["tests"].append({
+            "name": "DAV OPTIONS",
+            "status": "failed",
+            "error": str(e)
+        })
+
+    # Test 3: caldav client connection
+    try:
+        client = CardDAVClient(
+            url=debug_data.carddav_url,
+            username=debug_data.carddav_username,
+            password=debug_data.carddav_password,
+            verify_ssl=debug_data.verify_ssl
+        )
+        client.connect()
+        results["tests"].append({
+            "name": "CardDAV Client Connection",
+            "status": "success",
+            "details": "Successfully connected to CardDAV server"
+        })
+    except Exception as e:
+        results["tests"].append({
+            "name": "CardDAV Client Connection",
+            "status": "failed",
+            "error": str(e)
+        })
+
+    # Test 4: Fetch contacts count
+    try:
+        client = CardDAVClient(
+            url=debug_data.carddav_url,
+            username=debug_data.carddav_username,
+            password=debug_data.carddav_password,
+            verify_ssl=debug_data.verify_ssl
+        )
+        contacts = client.fetch_contacts()
+        results["tests"].append({
+            "name": "Fetch Contacts",
+            "status": "success",
+            "details": f"Found {len(contacts)} contacts"
+        })
+    except Exception as e:
+        results["tests"].append({
+            "name": "Fetch Contacts",
+            "status": "failed",
+            "error": str(e)
+        })
+
+    # Generate suggestions
+    from urllib.parse import urlparse
+    parsed = urlparse(debug_data.carddav_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    results["suggestions"] = [
+        f"{base_url}/remote.php/dav/addressbooks/users/{debug_data.carddav_username}/",
+        f"{base_url}/remote.php/dav/addressbooks/users/{debug_data.carddav_username}/contacts/",
+        f"{base_url}/carddav/addressbooks/{debug_data.carddav_username}/",
+        f"{base_url}/addressbooks/{debug_data.carddav_username}/",
+        f"{base_url}/{debug_data.carddav_username}/addressbook.vcf/",
+        f"{base_url}/card.php/addressbooks/{debug_data.carddav_username}/default/"
+    ]
+
+    return results
 
 # XML phonebook endpoint
 @app.get("/phonebook.xml")

@@ -109,3 +109,11 @@ class CardDAVSync(BaseModel):
     carddav_username: str
     carddav_password: str
     clear_existing: bool = False
+    verify_ssl: bool = True
+
+# CardDAV debug schema
+class CardDAVDebug(BaseModel):
+    carddav_url: str
+    carddav_username: str
+    carddav_password: str
+    verify_ssl: bool = True

@@ -4,6 +4,7 @@ import {
   updateSettings,
   syncCardDAV,
   testCardDAVConnection,
+  debugCardDAVConnection,
   Settings as SettingsType,
 } from '../services/api';
 import './Settings.css';
@@ -21,9 +22,12 @@ const Settings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [debugging, setDebugging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
+  const [verifySSL, setVerifySSL] = useState(true);
+  const [debugResults, setDebugResults] = useState<any>(null);
 
   useEffect(() => {
     loadSettings();
@@ -71,6 +75,7 @@ const Settings: React.FC = () => {
         carddav_username: settings.carddav_username,
         carddav_password: settings.carddav_password,
         clear_existing: false,
+        verify_ssl: verifySSL,
       });
       setSuccess(result.message);
     } catch (err: any) {
@@ -78,6 +83,28 @@ const Settings: React.FC = () => {
       console.error(err);
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleDebug = async () => {
+    setError(null);
+    setSuccess(null);
+    setDebugResults(null);
+
+    try {
+      setDebugging(true);
+      const result = await debugCardDAVConnection({
+        carddav_url: settings.carddav_url,
+        carddav_username: settings.carddav_username,
+        carddav_password: settings.carddav_password,
+        verify_ssl: verifySSL,
+      });
+      setDebugResults(result);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Debug failed');
+      console.error(err);
+    } finally {
+      setDebugging(false);
     }
   };
 
@@ -96,6 +123,7 @@ const Settings: React.FC = () => {
         carddav_username: settings.carddav_username,
         carddav_password: settings.carddav_password,
         clear_existing: clearExisting,
+        verify_ssl: verifySSL,
       });
       setSuccess(result.message);
     } catch (err: any) {
@@ -197,7 +225,29 @@ const Settings: React.FC = () => {
             />
           </div>
 
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={verifySSL}
+                onChange={(e) => setVerifySSL(e.target.checked)}
+              />
+              Verify SSL/TLS certificates
+            </label>
+            <small className="form-help">
+              Uncheck this if your server uses self-signed certificates
+            </small>
+          </div>
+
           <div className="form-actions">
+            <button
+              type="button"
+              onClick={handleDebug}
+              className="btn btn-secondary"
+              disabled={debugging || !settings.carddav_url}
+            >
+              {debugging ? 'Debugging...' : 'Debug Connection'}
+            </button>
             <button
               type="button"
               onClick={handleTestConnection}
@@ -215,6 +265,49 @@ const Settings: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* Debug Results */}
+        {debugResults && (
+          <div className="debug-results">
+            <h4>Debug Results</h4>
+
+            {debugResults.tests.map((test: any, index: number) => (
+              <div key={index} className={`debug-test ${test.status === 'success' ? 'success' : 'failed'}`}>
+                <h5>
+                  {test.status === 'success' ? '✓' : '✗'} {test.name}
+                </h5>
+                {test.status === 'success' && test.details && (
+                  <pre>{typeof test.details === 'string' ? test.details : JSON.stringify(test.details, null, 2)}</pre>
+                )}
+                {test.status === 'failed' && test.error && (
+                  <div className="error-message">{test.error}</div>
+                )}
+              </div>
+            ))}
+
+            {debugResults.suggestions && debugResults.suggestions.length > 0 && (
+              <div className="debug-suggestions">
+                <h5>Suggested URLs to try:</h5>
+                <ul>
+                  {debugResults.suggestions.map((url: string, index: number) => (
+                    <li key={index}>
+                      <code>{url}</code>
+                      <button
+                        className="btn btn-secondary btn-small"
+                        onClick={() => {
+                          setSettings(prev => ({ ...prev, carddav_url: url }));
+                          setDebugResults(null);
+                        }}
+                      >
+                        Use This
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sync Controls */}
