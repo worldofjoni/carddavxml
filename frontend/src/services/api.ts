@@ -68,6 +68,9 @@ export interface Settings {
   carddav_password: string;
   sync_enabled: boolean;
   auto_sync_interval: number;
+  last_sync?: string;
+  last_sync_status?: string;
+  last_sync_message?: string;
 }
 
 export interface CardDAVSync {
