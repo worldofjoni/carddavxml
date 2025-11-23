@@ -310,9 +310,91 @@ const Settings: React.FC = () => {
         )}
       </div>
 
-      {/* Sync Controls */}
+      {/* Auto-Sync Configuration */}
       <div className="settings-section">
-        <h3 className="settings-section-title">Sync Contacts from CardDAV</h3>
+        <h3 className="settings-section-title">Automatic Synchronization</h3>
+
+        <div className="auto-sync-controls">
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                name="sync_enabled"
+                checked={settings.sync_enabled}
+                onChange={handleChange}
+              />
+              Enable automatic synchronization
+            </label>
+            <small className="form-help">
+              Automatically sync contacts from CardDAV server at regular intervals
+            </small>
+          </div>
+
+          {settings.sync_enabled && (
+            <div className="form-group">
+              <label htmlFor="auto_sync_interval">Sync Interval (seconds)</label>
+              <select
+                id="auto_sync_interval"
+                name="auto_sync_interval"
+                value={settings.auto_sync_interval}
+                onChange={handleChange}
+              >
+                <option value="300">5 minutes (300 seconds)</option>
+                <option value="600">10 minutes (600 seconds)</option>
+                <option value="900">15 minutes (900 seconds)</option>
+                <option value="1800">30 minutes (1800 seconds)</option>
+                <option value="3600">1 hour (3600 seconds)</option>
+                <option value="7200">2 hours (7200 seconds)</option>
+                <option value="14400">4 hours (14400 seconds)</option>
+                <option value="21600">6 hours (21600 seconds)</option>
+                <option value="43200">12 hours (43200 seconds)</option>
+                <option value="86400">24 hours (86400 seconds)</option>
+              </select>
+              <small className="form-help">
+                How often to automatically sync contacts from your CardDAV server
+              </small>
+            </div>
+          )}
+
+          {settings.last_sync && (
+            <div className="sync-status">
+              <h4>Last Sync Status</h4>
+              <div className={`sync-status-card ${settings.last_sync_status}`}>
+                <div className="sync-status-row">
+                  <strong>Time:</strong>
+                  <span>{new Date(settings.last_sync).toLocaleString()}</span>
+                </div>
+                <div className="sync-status-row">
+                  <strong>Status:</strong>
+                  <span className={`status-badge ${settings.last_sync_status}`}>
+                    {settings.last_sync_status === 'success' && '✓ Success'}
+                    {settings.last_sync_status === 'failed' && '✗ Failed'}
+                    {settings.last_sync_status === 'running' && '⟳ Running'}
+                  </span>
+                </div>
+                {settings.last_sync_message && (
+                  <div className="sync-status-row">
+                    <strong>Message:</strong>
+                    <span>{settings.last_sync_message}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            className="btn btn-primary"
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save Auto-Sync Settings'}
+          </button>
+        </div>
+      </div>
+
+      {/* Manual Sync Controls */}
+      <div className="settings-section">
+        <h3 className="settings-section-title">Manual Synchronization</h3>
 
         <div className="sync-controls">
           <div className="form-group">

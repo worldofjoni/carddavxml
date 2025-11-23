@@ -99,6 +99,9 @@ class SettingsCreate(SettingsBase):
 
 class SettingsResponse(SettingsBase):
     id: int
+    last_sync: str = ""
+    last_sync_status: str = ""
+    last_sync_message: str = ""
 
     class Config:
         from_attributes = True

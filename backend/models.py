@@ -63,3 +63,6 @@ class Settings(Base):
     carddav_password = Column(String(255), nullable=False)
     sync_enabled = Column(Boolean, default=False)
     auto_sync_interval = Column(Integer, default=3600)  # seconds
+    last_sync = Column(String(50), default="")  # ISO format timestamp
+    last_sync_status = Column(String(20), default="")  # success, failed, running
+    last_sync_message = Column(Text, default="")

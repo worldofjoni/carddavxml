@@ -10,3 +10,4 @@ requests==2.31.0
 urllib3==2.1.0
 lxml==4.9.3
 vobject==0.9.6.1
+apscheduler==3.10.4

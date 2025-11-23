@@ -70,6 +70,87 @@
   margin-bottom: 1.5rem;
 }
 
+.auto-sync-controls {
+  max-width: 600px;
+}
+
+.auto-sync-controls .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.sync-status {
+  margin: 2rem 0;
+}
+
+.sync-status h4 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.sync-status-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.sync-status-card.success {
+  border-left: 4px solid #27ae60;
+}
+
+.sync-status-card.failed {
+  border-left: 4px solid #e74c3c;
+}
+
+.sync-status-card.running {
+  border-left: 4px solid #3498db;
+}
+
+.sync-status-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sync-status-row:last-child {
+  border-bottom: none;
+}
+
+.sync-status-row strong {
+  color: #2c3e50;
+  min-width: 100px;
+}
+
+.sync-status-row span {
+  color: #555;
+  text-align: right;
+  flex: 1;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-badge.success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.running {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
 .form-help.warning {
   color: #e74c3c;
   font-weight: 600;

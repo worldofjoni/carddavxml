@@ -4,6 +4,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import List
 import logging
+import atexit
 
 from database import engine, Base, get_db
 from models import Contact, ContactGroup, Settings
@@ -15,6 +16,7 @@ from schemas import (
 )
 from xml_generator import generate_grandstream_xml
 from carddav_client import CardDAVClient
+from sync_scheduler import start_scheduler, stop_scheduler, update_scheduler
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -24,6 +26,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="CardDAV to XML Phonebook", version="1.0.0")
+
+# Start background scheduler
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting application...")
+    start_scheduler()
+
+# Stop scheduler on shutdown
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down application...")
+    stop_scheduler()
+
+# Also register cleanup handler
+atexit.register(stop_scheduler)
 
 # CORS configuration
 app.add_middleware(
@@ -151,6 +168,11 @@ async def update_settings(settings: SettingsCreate, db: Session = Depends(get_db
 
     db.commit()
     db.refresh(db_settings)
+
+    # Update the background sync scheduler
+    update_scheduler()
+    logger.info("Settings updated, scheduler reconfigured")
+
     return db_settings
 
 # CardDAV sync endpoint
