@@ -134,11 +134,23 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+
+    let finalValue: any = value;
+
+    if (type === 'checkbox') {
+      finalValue = checked;
+    } else if (name === 'auto_sync_interval') {
+      finalValue = parseInt(value);
+    } else if (type === 'number') {
+      finalValue = parseInt(value);
+    }
+
     setSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : (type === 'number' ? parseInt(value) : value),
+      [name]: finalValue,
     }));
   };
 
