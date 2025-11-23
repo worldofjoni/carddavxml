@@ -32,7 +32,7 @@ class CardDAVClient:
         logger.info(f"SSL verification: {self.verify_ssl}")
 
         try:
-            # Try with SSL verification first
+            # Create DAV client
             self.client = caldav.DAVClient(
                 url=self.url,
                 username=self.username,
@@ -40,30 +40,19 @@ class CardDAVClient:
                 ssl_verify_cert=self.verify_ssl
             )
 
-            logger.info("DAVClient created, attempting to get principal...")
+            logger.info("DAVClient created successfully")
 
-            # Try to get principal
+            # Try to get principal (optional - we can work without it)
             try:
                 self.principal = self.client.principal()
-                logger.info("Successfully connected and retrieved principal")
-                return True
+                logger.info("Successfully retrieved principal")
             except Exception as principal_error:
-                logger.error(f"Failed to get principal: {str(principal_error)}")
-                logger.info("Trying alternative connection method...")
+                logger.warning(f"Could not get principal: {str(principal_error)}")
+                logger.info("Will attempt direct addressbook access instead")
+                # Don't fail here - direct addressbook access can work without principal
+                self.principal = None
 
-                # Try direct URL approach
-                try:
-                    # Some servers need the URL to be the addressbook URL directly
-                    import caldav.objects
-                    self.principal = caldav.objects.Principal(
-                        client=self.client,
-                        url=self.url
-                    )
-                    logger.info("Successfully connected using alternative method")
-                    return True
-                except Exception as alt_error:
-                    logger.error(f"Alternative method also failed: {str(alt_error)}")
-                    raise principal_error
+            return True
 
         except Exception as e:
             logger.error(f"Failed to connect to CardDAV server: {str(e)}")
@@ -97,68 +86,79 @@ class CardDAVClient:
 
     def fetch_contacts(self) -> List[Dict]:
         """Fetch all contacts from CardDAV server"""
-        if not self.client or not self.principal:
+        if not self.client:
             self.connect()
 
         contacts = []
 
         try:
-            # Try to get address books
+            # Try direct addressbook access first (works with more server types)
+            logger.info("Attempting direct addressbook access...")
             try:
-                address_books = self.principal.addressbooks()
-                logger.info(f"Found {len(address_books)} address books")
+                import caldav.objects
+                addressbook = caldav.objects.AddressBook(
+                    client=self.client,
+                    url=self.url
+                )
 
-                for address_book in address_books:
-                    logger.info(f"Processing address book: {address_book.url}")
-                    # Get all vcards from address book
+                vcards = addressbook.search(None)
+                logger.info(f"Found {len(vcards)} contacts via direct access")
+
+                for vcard_obj in vcards:
                     try:
-                        vcards = address_book.search(None)
-                        logger.info(f"Found {len(vcards)} contacts in address book")
-
-                        for vcard_obj in vcards:
-                            try:
-                                contact_data = self._parse_vcard(vcard_obj)
-                                if contact_data:
-                                    contacts.append(contact_data)
-                            except Exception as e:
-                                logger.warning(f"Failed to parse vcard: {str(e)}")
-                                continue
-
+                        contact_data = self._parse_vcard(vcard_obj)
+                        if contact_data:
+                            contacts.append(contact_data)
                     except Exception as e:
-                        logger.warning(f"Failed to fetch vcards from address book: {str(e)}")
+                        logger.warning(f"Failed to parse vcard: {str(e)}")
                         continue
 
-            except Exception as addressbook_error:
-                logger.warning(f"Could not get addressbooks via principal: {str(addressbook_error)}")
-                logger.info("Trying direct addressbook access...")
+                # If direct access worked, return early
+                if contacts or len(vcards) == 0:
+                    logger.info(f"Successfully fetched {len(contacts)} contacts via direct access")
+                    return contacts
 
-                # Try direct access if URL points to addressbook
+            except Exception as direct_error:
+                logger.warning(f"Direct addressbook access failed: {str(direct_error)}")
+                logger.info("Trying principal.addressbooks() method...")
+
+            # Fallback to principal.addressbooks() method
+            if self.principal:
                 try:
-                    import caldav.objects
-                    addressbook = caldav.objects.AddressBook(
-                        client=self.client,
-                        url=self.url
-                    )
+                    address_books = self.principal.addressbooks()
+                    logger.info(f"Found {len(address_books)} address books")
 
-                    vcards = addressbook.search(None)
-                    logger.info(f"Found {len(vcards)} contacts via direct access")
-
-                    for vcard_obj in vcards:
+                    for address_book in address_books:
+                        logger.info(f"Processing address book: {address_book.url}")
+                        # Get all vcards from address book
                         try:
-                            contact_data = self._parse_vcard(vcard_obj)
-                            if contact_data:
-                                contacts.append(contact_data)
+                            vcards = address_book.search(None)
+                            logger.info(f"Found {len(vcards)} contacts in address book")
+
+                            for vcard_obj in vcards:
+                                try:
+                                    contact_data = self._parse_vcard(vcard_obj)
+                                    if contact_data:
+                                        contacts.append(contact_data)
+                                except Exception as e:
+                                    logger.warning(f"Failed to parse vcard: {str(e)}")
+                                    continue
+
                         except Exception as e:
-                            logger.warning(f"Failed to parse vcard: {str(e)}")
+                            logger.warning(f"Failed to fetch vcards from address book: {str(e)}")
                             continue
 
-                except Exception as direct_error:
-                    logger.error(f"Direct addressbook access also failed: {str(direct_error)}")
+                except Exception as addressbook_error:
+                    logger.error(f"Could not get addressbooks via principal: {str(addressbook_error)}")
                     raise Exception(
-                        f"Could not access contacts. "
-                        f"Original error: {addressbook_error}. "
-                        f"Direct access error: {direct_error}"
+                        f"Could not access contacts using any method. "
+                        f"Direct access error: {direct_error}. "
+                        f"Principal method error: {addressbook_error}"
                     )
+            else:
+                raise Exception(
+                    f"Could not access contacts. Direct access failed: {direct_error}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to fetch contacts: {str(e)}")
