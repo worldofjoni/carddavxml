@@ -15,22 +15,22 @@ class Contact(Base):
 
     # Phone numbers stored as JSON array
     # Format: [{"type": "Mobile", "number": "123456", "accountindex": -1}]
-    phones = Column(JSON, default=list)
+    phones = Column(JSON, default=lambda: [])
 
     # Email addresses stored as JSON array
     # Format: [{"type": "Home", "email": "test@example.com"}]
-    emails = Column(JSON, default=list)
+    emails = Column(JSON, default=lambda: [])
 
     # Groups - comma separated group IDs
     groups = Column(String(255), default="")
 
     # Organization info stored as JSON
     # Format: {"company": "Company", "title": "CEO", "department": ""}
-    organization = Column(JSON, default=dict)
+    organization = Column(JSON, default=lambda: {})
 
     # Address stored as JSON
     # Format: {"street": "", "city": "", "state": "", "postal_code": "", "country": ""}
-    address = Column(JSON, default=dict)
+    address = Column(JSON, default=lambda: {})
 
     # Website
     website = Column(String(512), default="")

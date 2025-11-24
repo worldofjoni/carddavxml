@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Use empty string to make requests to same origin (nginx will proxy to backend)
+// Falls back to localhost:8000 for local development without Docker
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 const api = axios.create({
   baseURL: API_URL,
