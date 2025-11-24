@@ -90,6 +90,7 @@ class CardDAVClient:
             self.connect()
 
         contacts = []
+        direct_error = None  # Initialize to None for proper scoping
 
         try:
             # Try direct addressbook access first (works with more server types)
@@ -150,14 +151,16 @@ class CardDAVClient:
 
                 except Exception as addressbook_error:
                     logger.error(f"Could not get addressbooks via principal: {str(addressbook_error)}")
+                    direct_msg = str(direct_error) if direct_error else "Unknown error or no contacts found"
                     raise Exception(
                         f"Could not access contacts using any method. "
-                        f"Direct access error: {direct_error}. "
+                        f"Direct access error: {direct_msg}. "
                         f"Principal method error: {addressbook_error}"
                     )
             else:
+                direct_msg = str(direct_error) if direct_error else "Unknown error or no contacts found"
                 raise Exception(
-                    f"Could not access contacts. Direct access failed: {direct_error}"
+                    f"Could not access contacts. Direct access failed: {direct_msg}"
                 )
 
         except Exception as e:
