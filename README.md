@@ -39,19 +39,16 @@ cd carddavxml
 docker-compose up -d
 ```
 
-3. Access the web UI:
+3. Access the web UI and API:
 ```
 http://localhost:3000
 ```
 
-4. The API will be available at:
-```
-http://localhost:8000
-```
+The web UI is served on port 3000, and all API requests are automatically proxied through nginx to the backend.
 
-5. The XML phonebook will be available at:
+4. The XML phonebook will be available at:
 ```
-http://localhost:8000/phonebook.xml
+http://localhost:3000/phonebook.xml
 ```
 
 ## Configuration
@@ -78,7 +75,7 @@ http://localhost:8000/phonebook.xml
 2. Navigate to **Phonebook** → **XML Phonebook**
 3. Add a new phonebook entry:
    - **Name**: Any name (e.g., "My Contacts")
-   - **URL**: `http://<your-server-ip>:8000/phonebook.xml`
+   - **URL**: `http://<your-server-ip>:3000/phonebook.xml`
 4. Save and the phone will download the phonebook
 
 ## Usage
@@ -169,30 +166,46 @@ The application generates XML in Grandstream format with support for:
 
 ## Development
 
-### Backend Development
+### Local Development (without Docker)
 
+For local development without Docker:
+
+1. **Backend:**
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend Development
-
+2. **Frontend:**
 ```bash
 cd frontend
+# Set API URL for local development
+export REACT_APP_API_URL=http://localhost:8000
 npm install
 npm start
+```
+
+The frontend will run on port 3000 and connect to the backend on port 8000.
+
+### Docker Development
+
+For development with Docker:
+
+```bash
+docker-compose up --build
 ```
 
 ### Environment Variables
 
 #### Backend
 - `DATABASE_URL`: Database connection string (default: `sqlite:///data/carddav.db`)
-- `CORS_ORIGINS`: Allowed CORS origins
+- `CORS_ORIGINS`: Allowed CORS origins (default: allows all in dev)
 
 #### Frontend
-- `REACT_APP_API_URL`: Backend API URL (default: `http://localhost:8000`)
+- `REACT_APP_API_URL`: Backend API URL
+  - Empty (default for Docker): Uses nginx proxy to backend
+  - `http://localhost:8000`: For local development without Docker
 
 ## Supported CardDAV Servers
 
@@ -228,9 +241,16 @@ Contact data is stored in a SQLite database located at `/app/data/carddav.db` in
 If ports 3000 or 8000 are already in use, modify the `docker-compose.yml` file:
 
 ```yaml
+# Frontend (change port 3000 to something else)
 ports:
-  - "8080:8000"  # Change 8000 to 8080
+  - "8080:80"  # Access via http://localhost:8080
+
+# Backend (only needed if running locally, not required for Docker deployment)
+ports:
+  - "8001:8000"  # Change 8000 to 8001
 ```
+
+Note: When using Docker, the frontend proxies all API requests through nginx, so you only need to access port 3000 (or whatever you changed it to).
 
 ## License
 
