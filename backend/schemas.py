@@ -92,6 +92,7 @@ class SettingsBase(BaseModel):
     carddav_username: str
     carddav_password: str
     sync_enabled: bool = False
+    bidirectional_sync: bool = False
     auto_sync_interval: int = 3600
 
 class SettingsCreate(SettingsBase):

@@ -55,12 +55,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Helper function to get CardDAV client if sync is enabled
+# Helper function to get CardDAV client if bidirectional sync is enabled
 def get_carddav_client(db: Session) -> CardDAVClient | None:
-    """Get CardDAV client if sync is enabled, None otherwise"""
+    """Get CardDAV client if bidirectional sync is enabled, None otherwise"""
     try:
         settings = db.query(Settings).first()
-        if settings and settings.sync_enabled and settings.carddav_url:
+        if settings and settings.sync_enabled and settings.bidirectional_sync and settings.carddav_url:
             return CardDAVClient(
                 url=settings.carddav_url,
                 username=settings.carddav_username,
@@ -245,7 +245,8 @@ async def get_settings(db: Session = Depends(get_db)):
             carddav_url="",
             carddav_username="",
             carddav_password="",
-            sync_enabled=False
+            sync_enabled=False,
+            bidirectional_sync=False
         )
         db.add(settings)
         db.commit()

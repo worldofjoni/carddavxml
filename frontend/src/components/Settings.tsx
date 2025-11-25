@@ -15,6 +15,7 @@ const Settings: React.FC = () => {
     carddav_username: '',
     carddav_password: '',
     sync_enabled: false,
+    bidirectional_sync: false,
     auto_sync_interval: 3600,
   });
 
@@ -339,6 +340,21 @@ const Settings: React.FC = () => {
             </label>
             <small className="form-help">
               Automatically sync contacts from CardDAV server at regular intervals
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                name="bidirectional_sync"
+                checked={settings.bidirectional_sync}
+                onChange={handleChange}
+              />
+              Enable bidirectional sync (push changes to CardDAV)
+            </label>
+            <small className="form-help">
+              When enabled, contacts created/edited/deleted in the web UI will automatically sync back to your CardDAV server. Disable to only retrieve contacts from CardDAV.
             </small>
           </div>
 
