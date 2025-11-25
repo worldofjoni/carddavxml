@@ -55,6 +55,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Helper function to get CardDAV client if sync is enabled
+def get_carddav_client(db: Session) -> CardDAVClient | None:
+    """Get CardDAV client if sync is enabled, None otherwise"""
+    try:
+        settings = db.query(Settings).first()
+        if settings and settings.sync_enabled and settings.carddav_url:
+            return CardDAVClient(
+                url=settings.carddav_url,
+                username=settings.carddav_username,
+                password=settings.carddav_password,
+                verify_ssl=True
+            )
+    except Exception as e:
+        logger.warning(f"Could not create CardDAV client: {str(e)}")
+    return None
+
+# Helper function to convert Contact model to dict
+def contact_to_dict(contact: Contact) -> dict:
+    """Convert Contact SQLAlchemy model to dictionary"""
+    return {
+        "first_name": contact.first_name,
+        "last_name": contact.last_name,
+        "is_primary": contact.is_primary,
+        "primary": contact.primary,
+        "frequent": contact.frequent,
+        "ringtone": contact.ringtone,
+        "photo_url": contact.photo_url,
+        "phones": contact.phones,
+        "emails": contact.emails,
+        "groups": contact.groups,
+        "organization": contact.organization,
+        "address": contact.address,
+        "website": contact.website,
+        "notes": contact.notes,
+        "birthday": contact.birthday,
+        "carddav_uid": contact.carddav_uid,
+        "carddav_etag": contact.carddav_etag,
+    }
+
 # Health check
 @app.get("/")
 async def root():
@@ -82,6 +121,25 @@ async def create_contact(contact: ContactCreate, db: Session = Depends(get_db)):
     db.add(db_contact)
     db.commit()
     db.refresh(db_contact)
+
+    # Push to CardDAV if sync is enabled
+    carddav_client = get_carddav_client(db)
+    if carddav_client:
+        try:
+            contact_dict = contact_to_dict(db_contact)
+            updated_contact = carddav_client.create_contact(contact_dict)
+
+            # Update UID and etag in database
+            db_contact.carddav_uid = updated_contact.get('carddav_uid', db_contact.carddav_uid)
+            db_contact.carddav_etag = updated_contact.get('carddav_etag', db_contact.carddav_etag)
+            db.commit()
+            db.refresh(db_contact)
+
+            logger.info(f"Contact synced to CardDAV: {db_contact.first_name} {db_contact.last_name}")
+        except Exception as e:
+            logger.warning(f"Failed to sync contact to CardDAV: {str(e)}")
+            # Don't fail the request, just log the error
+
     return db_contact
 
 @app.put("/api/contacts/{contact_id}", response_model=ContactResponse)
@@ -100,6 +158,32 @@ async def update_contact(
 
     db.commit()
     db.refresh(db_contact)
+
+    # Push to CardDAV if sync is enabled
+    carddav_client = get_carddav_client(db)
+    if carddav_client:
+        try:
+            contact_dict = contact_to_dict(db_contact)
+
+            # Only update if contact has a UID (was synced from CardDAV)
+            if db_contact.carddav_uid:
+                updated_contact = carddav_client.update_contact(contact_dict)
+                db_contact.carddav_etag = updated_contact.get('carddav_etag', db_contact.carddav_etag)
+                db.commit()
+                db.refresh(db_contact)
+                logger.info(f"Contact updated on CardDAV: {db_contact.first_name} {db_contact.last_name}")
+            else:
+                # Contact was created locally, create it on CardDAV
+                updated_contact = carddav_client.create_contact(contact_dict)
+                db_contact.carddav_uid = updated_contact.get('carddav_uid', db_contact.carddav_uid)
+                db_contact.carddav_etag = updated_contact.get('carddav_etag', db_contact.carddav_etag)
+                db.commit()
+                db.refresh(db_contact)
+                logger.info(f"Contact created on CardDAV: {db_contact.first_name} {db_contact.last_name}")
+        except Exception as e:
+            logger.warning(f"Failed to sync contact to CardDAV: {str(e)}")
+            # Don't fail the request, just log the error
+
     return db_contact
 
 @app.delete("/api/contacts/{contact_id}")
@@ -108,6 +192,16 @@ async def delete_contact(contact_id: int, db: Session = Depends(get_db)):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
+
+    # Delete from CardDAV if sync is enabled and contact has UID
+    carddav_client = get_carddav_client(db)
+    if carddav_client and contact.carddav_uid:
+        try:
+            carddav_client.delete_contact(contact.carddav_uid)
+            logger.info(f"Contact deleted from CardDAV: {contact.first_name} {contact.last_name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete contact from CardDAV: {str(e)}")
+            # Don't fail the request, just log the error
 
     db.delete(contact)
     db.commit()
