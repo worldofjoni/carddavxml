@@ -15,6 +15,7 @@ const Settings: React.FC = () => {
     carddav_username: '',
     carddav_password: '',
     sync_enabled: false,
+    bidirectional_sync: false,
     auto_sync_interval: 3600,
   });
 
@@ -158,7 +159,8 @@ const Settings: React.FC = () => {
     return <div className="loading">Loading settings...</div>;
   }
 
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  // Use current window location for phonebook URL (works with IP addresses and remote access)
+  const phonebookUrl = `${window.location.origin}/phonebook.xml`;
 
   return (
     <div className="container">
@@ -175,11 +177,11 @@ const Settings: React.FC = () => {
         <div className="phonebook-url-card">
           <p>Configure your Grandstream phone to use this URL for the phonebook:</p>
           <div className="url-display">
-            <code>{apiUrl}/phonebook.xml</code>
+            <code>{phonebookUrl}</code>
             <button
               className="btn btn-secondary btn-small"
               onClick={() => {
-                navigator.clipboard.writeText(`${apiUrl}/phonebook.xml`);
+                navigator.clipboard.writeText(phonebookUrl);
                 setSuccess('URL copied to clipboard!');
                 setTimeout(() => setSuccess(null), 3000);
               }}
@@ -188,7 +190,7 @@ const Settings: React.FC = () => {
             </button>
           </div>
           <p className="url-help">
-            <a href={`${apiUrl}/phonebook.xml`} target="_blank" rel="noopener noreferrer">
+            <a href={phonebookUrl} target="_blank" rel="noopener noreferrer">
               Open XML Phonebook
             </a>
           </p>
@@ -339,6 +341,21 @@ const Settings: React.FC = () => {
             </label>
             <small className="form-help">
               Automatically sync contacts from CardDAV server at regular intervals
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                name="bidirectional_sync"
+                checked={settings.bidirectional_sync}
+                onChange={handleChange}
+              />
+              Enable bidirectional sync (push changes to CardDAV)
+            </label>
+            <small className="form-help">
+              When enabled, contacts created/edited/deleted in the web UI will automatically sync back to your CardDAV server. Disable to only retrieve contacts from CardDAV.
             </small>
           </div>
 

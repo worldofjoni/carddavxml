@@ -40,6 +40,9 @@ def migrate_database():
             if 'last_sync_message' not in columns:
                 migrations_needed.append("ALTER TABLE settings ADD COLUMN last_sync_message TEXT DEFAULT ''")
 
+            if 'bidirectional_sync' not in columns:
+                migrations_needed.append("ALTER TABLE settings ADD COLUMN bidirectional_sync BOOLEAN DEFAULT 0")
+
             if migrations_needed:
                 logger.info(f"Applying {len(migrations_needed)} database migrations...")
                 for migration in migrations_needed:

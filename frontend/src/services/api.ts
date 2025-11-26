@@ -69,6 +69,7 @@ export interface Settings {
   carddav_username: string;
   carddav_password: string;
   sync_enabled: boolean;
+  bidirectional_sync: boolean;
   auto_sync_interval: number;
   last_sync?: string;
   last_sync_status?: string;
