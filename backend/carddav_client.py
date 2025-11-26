@@ -85,7 +85,7 @@ class CardDAVClient:
                 raise Exception(f"Connection error: {str(e)}")
 
     def fetch_contacts(self) -> List[Dict]:
-        """Fetch all contacts from CardDAV server"""
+        """Fetch all contacts from CardDAV server using raw HTTP requests"""
         if not self.client:
             self.connect()
 
@@ -93,23 +93,75 @@ class CardDAVClient:
         direct_error = None  # Initialize to None for proper scoping
 
         try:
-            # Try direct addressbook access first (works with more server types)
-            logger.info("Attempting direct addressbook access...")
-            try:
-                import caldav.objects
-                addressbook = caldav.objects.AddressBook(
-                    client=self.client,
-                    url=self.url
-                )
+            logger.info("Fetching contacts using CardDAV protocol...")
 
-                vcards = addressbook.search(None)
-                logger.info(f"Found {len(vcards)} contacts via direct access")
+            # Use raw HTTP requests since caldav library is for CalDAV, not CardDAV
+            # CardDAV REPORT query to get all vcards
+            report_body = '''<?xml version="1.0" encoding="utf-8" ?>
+<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
+  <D:prop>
+    <D:getetag/>
+    <C:address-data/>
+  </D:prop>
+</C:addressbook-query>'''
 
-                for vcard_obj in vcards:
+            headers = {
+                'Content-Type': 'application/xml; charset=utf-8',
+                'Depth': '1'
+            }
+
+            auth = HTTPBasicAuth(self.username, self.password)
+
+            logger.info(f"Sending REPORT request to {self.url}")
+            response = requests.request(
+                'REPORT',
+                self.url,
+                data=report_body,
+                headers=headers,
+                auth=auth,
+                verify=self.verify_ssl
+            )
+
+            logger.info(f"REPORT response status: {response.status_code}")
+
+            if response.status_code == 207:  # Multi-Status
+                # Parse the XML response
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(response.content)
+
+                # Define namespaces
+                ns = {
+                    'D': 'DAV:',
+                    'C': 'urn:ietf:params:xml:ns:carddav'
+                }
+
+                # Find all response elements
+                responses = root.findall('.//D:response', ns)
+                logger.info(f"Found {len(responses)} vcard responses")
+
+                for resp in responses:
                     try:
-                        contact_data = self._parse_vcard(vcard_obj)
-                        if contact_data:
-                            contacts.append(contact_data)
+                        # Get the vcard data
+                        address_data = resp.find('.//C:address-data', ns)
+                        if address_data is not None and address_data.text:
+                            # Parse vcard
+                            vcard = vobject.readOne(address_data.text)
+
+                            # Get etag if available
+                            etag_elem = resp.find('.//D:getetag', ns)
+                            etag = etag_elem.text if etag_elem is not None else ''
+
+                            # Create a simple object to hold vcard data and etag
+                            class VCardObject:
+                                def __init__(self, data, etag):
+                                    self.data = data
+                                    self.etag = etag
+
+                            vcard_obj = VCardObject(address_data.text, etag)
+                            contact_data = self._parse_vcard(vcard_obj)
+                            if contact_data:
+                                contacts.append(contact_data)
+
                     except Exception as e:
                         logger.warning(f"Failed to parse vcard: {str(e)}")
                         continue
@@ -162,7 +214,16 @@ class CardDAVClient:
                 raise Exception(
                     f"Could not access contacts. Direct access failed: {direct_msg}"
                 )
+            elif response.status_code == 401:
+                raise Exception("Authentication failed. Please check your username and password.")
+            elif response.status_code == 404:
+                raise Exception("Addressbook not found. Please check the CardDAV URL.")
+            else:
+                raise Exception(f"CardDAV REPORT failed with status {response.status_code}: {response.text}")
 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP request failed: {str(e)}")
+            raise Exception(f"Failed to connect to CardDAV server: {str(e)}")
         except Exception as e:
             logger.error(f"Failed to fetch contacts: {str(e)}")
             raise
