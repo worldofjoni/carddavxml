@@ -159,7 +159,8 @@ const Settings: React.FC = () => {
     return <div className="loading">Loading settings...</div>;
   }
 
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  // Use current window location for phonebook URL (works with IP addresses and remote access)
+  const phonebookUrl = `${window.location.origin}/phonebook.xml`;
 
   return (
     <div className="container">
@@ -176,11 +177,11 @@ const Settings: React.FC = () => {
         <div className="phonebook-url-card">
           <p>Configure your Grandstream phone to use this URL for the phonebook:</p>
           <div className="url-display">
-            <code>{apiUrl}/phonebook.xml</code>
+            <code>{phonebookUrl}</code>
             <button
               className="btn btn-secondary btn-small"
               onClick={() => {
-                navigator.clipboard.writeText(`${apiUrl}/phonebook.xml`);
+                navigator.clipboard.writeText(phonebookUrl);
                 setSuccess('URL copied to clipboard!');
                 setTimeout(() => setSuccess(null), 3000);
               }}
@@ -189,7 +190,7 @@ const Settings: React.FC = () => {
             </button>
           </div>
           <p className="url-help">
-            <a href={`${apiUrl}/phonebook.xml`} target="_blank" rel="noopener noreferrer">
+            <a href={phonebookUrl} target="_blank" rel="noopener noreferrer">
               Open XML Phonebook
             </a>
           </p>
