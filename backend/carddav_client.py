@@ -167,13 +167,23 @@ class CardDAVClient:
                         continue
 
                 # If direct access worked, return early
-                if contacts or len(vcards) == 0:
+                if contacts or len(responses) == 0:
                     logger.info(f"Successfully fetched {len(contacts)} contacts via direct access")
                     return contacts
 
-            except Exception as direct_error:
-                logger.warning(f"Direct addressbook access failed: {str(direct_error)}")
-                logger.info("Trying principal.addressbooks() method...")
+            elif response.status_code == 401:
+                raise Exception("Authentication failed. Please check your username and password.")
+            elif response.status_code == 404:
+                raise Exception("Addressbook not found. Please check the CardDAV URL.")
+            else:
+                raise Exception(f"CardDAV REPORT failed with status {response.status_code}: {response.text}")
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP request failed: {str(e)}")
+            raise Exception(f"Failed to connect to CardDAV server: {str(e)}")
+        except Exception as direct_error:
+            logger.warning(f"Direct addressbook access failed: {str(direct_error)}")
+            logger.info("Trying principal.addressbooks() method...")
 
             # Fallback to principal.addressbooks() method
             if self.principal:
@@ -214,19 +224,6 @@ class CardDAVClient:
                 raise Exception(
                     f"Could not access contacts. Direct access failed: {direct_msg}"
                 )
-            elif response.status_code == 401:
-                raise Exception("Authentication failed. Please check your username and password.")
-            elif response.status_code == 404:
-                raise Exception("Addressbook not found. Please check the CardDAV URL.")
-            else:
-                raise Exception(f"CardDAV REPORT failed with status {response.status_code}: {response.text}")
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"HTTP request failed: {str(e)}")
-            raise Exception(f"Failed to connect to CardDAV server: {str(e)}")
-        except Exception as e:
-            logger.error(f"Failed to fetch contacts: {str(e)}")
-            raise
 
         logger.info(f"Successfully fetched {len(contacts)} contacts")
         return contacts
