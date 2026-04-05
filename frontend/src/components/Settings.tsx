@@ -29,6 +29,8 @@ const Settings: React.FC = () => {
   const [clearExisting, setClearExisting] = useState(false);
   const [verifySSL, setVerifySSL] = useState(true);
   const [debugResults, setDebugResults] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordEntered, setPasswordEntered] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -38,7 +40,8 @@ const Settings: React.FC = () => {
     try {
       setLoading(true);
       const data = await getSettings();
-      setSettings(data);
+      setSettings({ ...data, carddav_password: '' });
+      setPasswordEntered('');
       setError(null);
     } catch (err) {
       setError('Failed to load settings');
@@ -55,8 +58,9 @@ const Settings: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateSettings(settings);
+      await updateSettings({ ...settings, carddav_password: passwordEntered });
       setSuccess('Settings saved successfully');
+      setPasswordEntered('');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to save settings');
       console.error(err);
@@ -74,7 +78,7 @@ const Settings: React.FC = () => {
       const result = await testCardDAVConnection({
         carddav_url: settings.carddav_url,
         carddav_username: settings.carddav_username,
-        carddav_password: settings.carddav_password,
+        carddav_password: passwordEntered || settings.carddav_password,
         clear_existing: false,
         verify_ssl: verifySSL,
       });
@@ -97,7 +101,7 @@ const Settings: React.FC = () => {
       const result = await debugCardDAVConnection({
         carddav_url: settings.carddav_url,
         carddav_username: settings.carddav_username,
-        carddav_password: settings.carddav_password,
+        carddav_password: passwordEntered || settings.carddav_password,
         verify_ssl: verifySSL,
       });
       setDebugResults(result);
@@ -122,7 +126,7 @@ const Settings: React.FC = () => {
       const result = await syncCardDAV({
         carddav_url: settings.carddav_url,
         carddav_username: settings.carddav_username,
-        carddav_password: settings.carddav_password,
+        carddav_password: passwordEntered || settings.carddav_password,
         clear_existing: clearExisting,
         verify_ssl: verifySSL,
       });
@@ -230,13 +234,30 @@ const Settings: React.FC = () => {
 
           <div className="form-group">
             <label htmlFor="carddav_password">Password</label>
-            <input
-              type="password"
-              id="carddav_password"
-              name="carddav_password"
-              value={settings.carddav_password}
-              onChange={handleChange}
-            />
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="carddav_password"
+                name="carddav_password"
+                value={passwordEntered}
+                onChange={(e) => setPasswordEntered(e.target.value)}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                autoComplete="new-password"
+                className="no-select"
+              />
+              <button
+                type="button"
+                className="btn btn-secondary btn-small password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <small className="form-help">
+              Enter a new password to update. Leave empty to keep current password.
+            </small>
           </div>
 
           <div className="form-group">

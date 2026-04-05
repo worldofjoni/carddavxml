@@ -316,3 +316,19 @@
     width: 100%;
   }
 }
+
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.password-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.password-input-wrapper input {
+  flex: 1;
+}
