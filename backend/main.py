@@ -230,9 +230,62 @@ async def delete_group(group_id: int, db: Session = Depends(get_db)):
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
+    # Remove group from all contacts
+    contacts = db.query(Contact).filter(Contact.groups.contains(str(group_id))).all()
+    for contact in contacts:
+        group_ids = [g.strip() for g in contact.groups.split(',') if g.strip()]
+        group_ids = [g for g in group_ids if int(g) != group_id]
+        contact.groups = ','.join(group_ids)
+
     db.delete(group)
     db.commit()
     return {"message": "Group deleted successfully"}
+
+@app.get("/api/groups/{group_id}/contacts", response_model=List[ContactResponse])
+async def get_group_contacts(group_id: int, db: Session = Depends(get_db)):
+    """Get all contacts in a specific group"""
+    group = db.query(ContactGroup).filter(ContactGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    contacts = db.query(Contact).filter(Contact.groups.contains(str(group_id))).all()
+    return contacts
+
+@app.post("/api/groups/{group_id}/contacts")
+async def add_contacts_to_group(group_id: int, contact_ids: List[int], db: Session = Depends(get_db)):
+    """Add contacts to a group"""
+    group = db.query(ContactGroup).filter(ContactGroup.id == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    added = []
+    for contact_id in contact_ids:
+        contact = db.query(Contact).filter(Contact.id == contact_id).first()
+        if contact:
+            current_groups = [g.strip() for g in contact.groups.split(',') if g.strip()]
+            if str(group_id) not in current_groups:
+                current_groups.append(str(group_id))
+                contact.groups = ','.join(current_groups)
+                added.append(contact_id)
+
+    db.commit()
+    return {"message": f"Added {len(added)} contact(s) to group", "added": added}
+
+@app.delete("/api/groups/{group_id}/contacts/{contact_id}")
+async def remove_contact_from_group(group_id: int, contact_id: int, db: Session = Depends(get_db)):
+    """Remove a contact from a group"""
+    contact = db.query(Contact).filter(Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    group_ids = [g.strip() for g in contact.groups.split(',') if g.strip()]
+    if str(group_id) in group_ids:
+        group_ids = [g for g in group_ids if g != str(group_id)]
+        contact.groups = ','.join(group_ids)
+        db.commit()
+        return {"message": "Contact removed from group"}
+    else:
+        raise HTTPException(status_code=404, detail="Contact not in this group")
 
 # Settings endpoints
 @app.get("/api/settings", response_model=SettingsResponse)

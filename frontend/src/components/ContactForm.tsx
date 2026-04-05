@@ -444,19 +444,34 @@ const ContactForm: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="groups">Groups (comma-separated IDs)</label>
-            <input
-              type="text"
-              id="groups"
-              name="groups"
-              value={formData.groups}
-              onChange={handleChange}
-              placeholder="e.g., 1,2,3"
-            />
-            {groups.length > 0 && (
-              <small className="form-help">
-                Available groups: {groups.map(g => `${g.name} (${g.id})`).join(', ')}
-              </small>
+            <label>Groups</label>
+            {groups.length === 0 ? (
+              <small className="form-help">No groups available. Create groups first.</small>
+            ) : (
+              <div className="group-checkboxes">
+                {groups.map(group => {
+                  const groupIds = formData.groups.split(',').map(g => g.trim()).filter(g => g);
+                  const isChecked = groupIds.includes(String(group.id));
+                  return (
+                    <label key={group.id} className="group-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          const newGroupIds = isChecked
+                            ? groupIds.filter(g => g !== String(group.id))
+                            : [...groupIds, String(group.id)];
+                          setFormData(prev => ({
+                            ...prev,
+                            groups: newGroupIds.join(',')
+                          }));
+                        }}
+                      />
+                      <span className="group-name">{group.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
             )}
           </div>
 

@@ -131,6 +131,21 @@ export const deleteGroup = async (id: number): Promise<void> => {
   await api.delete(`/api/groups/${id}`);
 };
 
+export const getGroupContacts = async (groupId: number): Promise<Contact[]> => {
+  const response = await api.get(`/api/groups/${groupId}/contacts`);
+  return response.data;
+};
+
+export const addContactsToGroup = async (groupId: number, contactIds: number[]): Promise<{ message: string; added: number[] }> => {
+  const response = await api.post(`/api/groups/${groupId}/contacts`, contactIds);
+  return response.data;
+};
+
+export const removeContactFromGroup = async (groupId: number, contactId: number): Promise<{ message: string }> => {
+  const response = await api.delete(`/api/groups/${groupId}/contacts/${contactId}`);
+  return response.data;
+};
+
 // Settings API
 export const getSettings = async (): Promise<Settings> => {
   const response = await api.get('/api/settings');
