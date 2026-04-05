@@ -18,7 +18,7 @@ function App() {
               <li><Link to="/groups">Groups</Link></li>
               <li><Link to="/settings">Settings</Link></li>
               <li>
-                <a href={`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/phonebook.xml`}
+                <a href={`${window.location.origin}/phonebook.xml`}
                    target="_blank"
                    rel="noopener noreferrer">
                   Download XML
