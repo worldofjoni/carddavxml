@@ -98,8 +98,13 @@ class SettingsBase(BaseModel):
 class SettingsCreate(SettingsBase):
     pass
 
-class SettingsResponse(SettingsBase):
+class SettingsResponse(BaseModel):
     id: int
+    carddav_url: str = ""
+    carddav_username: str = ""
+    sync_enabled: bool = False
+    bidirectional_sync: bool = False
+    auto_sync_interval: int = 3600
     last_sync: str = ""
     last_sync_status: str = ""
     last_sync_message: str = ""

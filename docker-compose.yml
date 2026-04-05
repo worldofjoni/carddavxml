@@ -6,8 +6,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: carddav-backend
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/app
       - carddav-data:/app/data
