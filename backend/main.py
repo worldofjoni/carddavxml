@@ -12,7 +12,7 @@ from schemas import (
     ContactCreate, ContactUpdate, ContactResponse,
     ContactGroupCreate, ContactGroupResponse,
     SettingsCreate, SettingsResponse,
-    CardDAVSync, CardDAVDebug
+    CardDAVSync
 )
 from xml_generator import generate_grandstream_xml
 from carddav_client import CardDAVClient
@@ -63,6 +63,22 @@ def get_carddav_client(db: Session) -> CardDAVClient | None:
     try:
         settings = db.query(Settings).first()
         if settings and settings.sync_enabled and settings.bidirectional_sync and settings.carddav_url:
+            return CardDAVClient(
+                url=settings.carddav_url,
+                username=settings.carddav_username,
+                password=settings.carddav_password,
+                verify_ssl=True
+            )
+    except Exception as e:
+        logger.warning(f"Could not create CardDAV client: {str(e)}")
+    return None
+
+# Helper function to get CardDAV client from stored settings
+def get_carddav_client_from_settings(db: Session) -> CardDAVClient | None:
+    """Get CardDAV client using stored settings"""
+    try:
+        settings = db.query(Settings).first()
+        if settings and settings.carddav_url and settings.carddav_username and settings.carddav_password:
             return CardDAVClient(
                 url=settings.carddav_url,
                 username=settings.carddav_username,
@@ -306,7 +322,11 @@ async def get_settings(db: Session = Depends(get_db)):
         db.add(settings)
         db.commit()
         db.refresh(settings)
-    return settings
+    # Add has_password field for frontend
+    return {
+        **SettingsResponse.model_validate(settings).model_dump(),
+        "has_password": bool(settings.carddav_password)
+    }
 
 @app.put("/api/settings", response_model=SettingsResponse)
 async def update_settings(settings: SettingsCreate, db: Session = Depends(get_db)):
@@ -332,13 +352,32 @@ async def update_settings(settings: SettingsCreate, db: Session = Depends(get_db
 # CardDAV sync endpoint
 @app.post("/api/sync/carddav")
 async def sync_carddav(sync_data: CardDAVSync, db: Session = Depends(get_db)):
-    """Sync contacts from CardDAV server"""
+    """Sync contacts from CardDAV server using stored credentials"""
     try:
+        settings = db.query(Settings).first()
+        
+        if not settings:
+            raise HTTPException(status_code=400, detail="CardDAV not configured. Please save settings first.")
+        
+        missing = []
+        if not settings.carddav_url:
+            missing.append("URL")
+        if not settings.carddav_username:
+            missing.append("username")
+        if not settings.carddav_password:
+            missing.append("password")
+        
+        if missing:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"CardDAV settings incomplete. Missing: {', '.join(missing)}. Please save settings first."
+            )
+        
         client = CardDAVClient(
-            url=sync_data.carddav_url,
-            username=sync_data.carddav_username,
-            password=sync_data.carddav_password,
-            verify_ssl=sync_data.verify_ssl
+            url=settings.carddav_url,
+            username=settings.carddav_username,
+            password=settings.carddav_password,
+            verify_ssl=True
         )
 
         contacts = client.fetch_contacts()
@@ -360,49 +399,74 @@ async def sync_carddav(sync_data: CardDAVSync, db: Session = Depends(get_db)):
             "message": f"Successfully imported {imported_count} contacts",
             "count": imported_count
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"CardDAV sync error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"CardDAV sync failed: {str(e)}")
 
 @app.post("/api/sync/test")
-async def test_carddav_connection(sync_data: CardDAVSync):
-    """Test CardDAV connection"""
+async def test_carddav_connection(db: Session = Depends(get_db)):
+    """Test CardDAV connection using stored credentials"""
     try:
+        settings = db.query(Settings).first()
+        
+        if not settings:
+            raise HTTPException(status_code=400, detail="CardDAV not configured. Please save settings first.")
+        
+        missing = []
+        if not settings.carddav_url:
+            missing.append("URL")
+        if not settings.carddav_username:
+            missing.append("username")
+        if not settings.carddav_password:
+            missing.append("password")
+        
+        if missing:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"CardDAV settings incomplete. Missing: {', '.join(missing)}. Please save settings first."
+            )
+        
         client = CardDAVClient(
-            url=sync_data.carddav_url,
-            username=sync_data.carddav_username,
-            password=sync_data.carddav_password,
-            verify_ssl=sync_data.verify_ssl
+            url=settings.carddav_url,
+            username=settings.carddav_username,
+            password=settings.carddav_password,
+            verify_ssl=True
         )
-
-        # Try to connect
         client.connect()
 
         return {"message": "Connection successful", "status": "ok"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"CardDAV connection test error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
 
 @app.post("/api/sync/debug")
-async def debug_carddav_connection(debug_data: CardDAVDebug):
+async def debug_carddav_connection(db: Session = Depends(get_db)):
     """Debug CardDAV connection with detailed diagnostics"""
     import requests
     from requests.auth import HTTPBasicAuth
 
+    settings = db.query(Settings).first()
+    if not settings or not settings.carddav_url:
+        raise HTTPException(status_code=400, detail="CardDAV not configured. Please save settings first.")
+
     results = {
-        "url": debug_data.carddav_url,
-        "username": debug_data.carddav_username,
-        "verify_ssl": debug_data.verify_ssl,
+        "url": settings.carddav_url,
+        "username": settings.carddav_username,
+        "verify_ssl": True,
         "tests": []
     }
 
     # Test 1: Basic HTTP connectivity
     try:
         response = requests.get(
-            debug_data.carddav_url,
-            auth=HTTPBasicAuth(debug_data.carddav_username, debug_data.carddav_password),
-            timeout=10,
-            verify=debug_data.verify_ssl
+            settings.carddav_url,
+            auth=HTTPBasicAuth(settings.carddav_username, settings.carddav_password),
+            timeout=3,
+            verify=True
         )
         results["tests"].append({
             "name": "HTTP Connectivity",
@@ -424,10 +488,10 @@ async def debug_carddav_connection(debug_data: CardDAVDebug):
     try:
         response = requests.request(
             'OPTIONS',
-            debug_data.carddav_url,
-            auth=HTTPBasicAuth(debug_data.carddav_username, debug_data.carddav_password),
-            timeout=10,
-            verify=debug_data.verify_ssl
+            settings.carddav_url,
+            auth=HTTPBasicAuth(settings.carddav_username, settings.carddav_password),
+            timeout=3,
+            verify=True
         )
         results["tests"].append({
             "name": "DAV OPTIONS",
@@ -445,13 +509,13 @@ async def debug_carddav_connection(debug_data: CardDAVDebug):
             "error": str(e)
         })
 
-    # Test 3: caldav client connection
+    # Test 3: CardDAV client connection
     try:
         client = CardDAVClient(
-            url=debug_data.carddav_url,
-            username=debug_data.carddav_username,
-            password=debug_data.carddav_password,
-            verify_ssl=debug_data.verify_ssl
+            url=settings.carddav_url,
+            username=settings.carddav_username,
+            password=settings.carddav_password,
+            verify_ssl=True
         )
         client.connect()
         results["tests"].append({
@@ -469,10 +533,10 @@ async def debug_carddav_connection(debug_data: CardDAVDebug):
     # Test 4: Fetch contacts count
     try:
         client = CardDAVClient(
-            url=debug_data.carddav_url,
-            username=debug_data.carddav_username,
-            password=debug_data.carddav_password,
-            verify_ssl=debug_data.verify_ssl
+            url=settings.carddav_url,
+            username=settings.carddav_username,
+            password=settings.carddav_password,
+            verify_ssl=True
         )
         contacts = client.fetch_contacts()
         results["tests"].append({
@@ -489,16 +553,16 @@ async def debug_carddav_connection(debug_data: CardDAVDebug):
 
     # Generate suggestions
     from urllib.parse import urlparse
-    parsed = urlparse(debug_data.carddav_url)
+    parsed = urlparse(settings.carddav_url)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
 
     results["suggestions"] = [
-        f"{base_url}/remote.php/dav/addressbooks/users/{debug_data.carddav_username}/",
-        f"{base_url}/remote.php/dav/addressbooks/users/{debug_data.carddav_username}/contacts/",
-        f"{base_url}/carddav/addressbooks/{debug_data.carddav_username}/",
-        f"{base_url}/addressbooks/{debug_data.carddav_username}/",
-        f"{base_url}/{debug_data.carddav_username}/addressbook.vcf/",
-        f"{base_url}/card.php/addressbooks/{debug_data.carddav_username}/default/"
+        f"{base_url}/remote.php/dav/addressbooks/users/{settings.carddav_username}/",
+        f"{base_url}/remote.php/dav/addressbooks/users/{settings.carddav_username}/contacts/",
+        f"{base_url}/carddav/addressbooks/{settings.carddav_username}/",
+        f"{base_url}/addressbooks/{settings.carddav_username}/",
+        f"{base_url}/{settings.carddav_username}/addressbook.vcf/",
+        f"{base_url}/card.php/addressbooks/{settings.carddav_username}/default/"
     ]
 
     return results

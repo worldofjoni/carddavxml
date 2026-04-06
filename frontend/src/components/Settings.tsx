@@ -13,7 +13,7 @@ const Settings: React.FC = () => {
   const [settings, setSettings] = useState<SettingsType>({
     carddav_url: '',
     carddav_username: '',
-    carddav_password: '',
+    has_password: false,
     sync_enabled: false,
     bidirectional_sync: false,
     auto_sync_interval: 3600,
@@ -29,8 +29,7 @@ const Settings: React.FC = () => {
   const [clearExisting, setClearExisting] = useState(false);
   const [verifySSL, setVerifySSL] = useState(true);
   const [debugResults, setDebugResults] = useState<any>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [passwordEntered, setPasswordEntered] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -40,8 +39,8 @@ const Settings: React.FC = () => {
     try {
       setLoading(true);
       const data = await getSettings();
-      setSettings({ ...data, carddav_password: '' });
-      setPasswordEntered('');
+      setSettings(data);
+      setPasswordInput('');
       setError(null);
     } catch (err) {
       setError('Failed to load settings');
@@ -58,9 +57,13 @@ const Settings: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateSettings({ ...settings, carddav_password: passwordEntered });
+      const updatedSettings = {
+        ...settings,
+        ...(passwordInput ? { carddav_password: passwordInput } : {})
+      };
+      await updateSettings(updatedSettings as SettingsType);
+      setPasswordInput('');
       setSuccess('Settings saved successfully');
-      setPasswordEntered('');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to save settings');
       console.error(err);
@@ -75,13 +78,7 @@ const Settings: React.FC = () => {
 
     try {
       setTesting(true);
-      const result = await testCardDAVConnection({
-        carddav_url: settings.carddav_url,
-        carddav_username: settings.carddav_username,
-        carddav_password: passwordEntered || settings.carddav_password,
-        clear_existing: false,
-        verify_ssl: verifySSL,
-      });
+      const result = await testCardDAVConnection();
       setSuccess(result.message);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Connection test failed');
@@ -98,12 +95,7 @@ const Settings: React.FC = () => {
 
     try {
       setDebugging(true);
-      const result = await debugCardDAVConnection({
-        carddav_url: settings.carddav_url,
-        carddav_username: settings.carddav_username,
-        carddav_password: passwordEntered || settings.carddav_password,
-        verify_ssl: verifySSL,
-      });
+      const result = await debugCardDAVConnection();
       setDebugResults(result);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Debug failed');
@@ -124,11 +116,7 @@ const Settings: React.FC = () => {
     try {
       setSyncing(true);
       const result = await syncCardDAV({
-        carddav_url: settings.carddav_url,
-        carddav_username: settings.carddav_username,
-        carddav_password: passwordEntered || settings.carddav_password,
         clear_existing: clearExisting,
-        verify_ssl: verifySSL,
       });
       setSuccess(result.message);
     } catch (err: any) {
@@ -234,29 +222,16 @@ const Settings: React.FC = () => {
 
           <div className="form-group">
             <label htmlFor="carddav_password">Password</label>
-            <div className="password-input-wrapper">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                id="carddav_password"
-                name="carddav_password"
-                value={passwordEntered}
-                onChange={(e) => setPasswordEntered(e.target.value)}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                onPaste={(e) => e.preventDefault()}
-                autoComplete="new-password"
-                className="no-select"
-              />
-              <button
-                type="button"
-                className="btn btn-secondary btn-small password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? 'Hide' : 'Show'}
-              </button>
-            </div>
+            <input
+              type="password"
+              id="carddav_password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              autoComplete="new-password"
+              placeholder={settings.has_password ? "••••••••" : "Enter password"}
+            />
             <small className="form-help">
-              Enter a new password to update. Leave empty to keep current password.
+              {settings.has_password ? 'Enter new password to update, or leave blank to keep current.' : 'Enter your CardDAV password.'}
             </small>
           </div>
 

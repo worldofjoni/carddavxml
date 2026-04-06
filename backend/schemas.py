@@ -102,6 +102,7 @@ class SettingsResponse(BaseModel):
     id: int
     carddav_url: str = ""
     carddav_username: str = ""
+    has_password: bool = False
     sync_enabled: bool = False
     bidirectional_sync: bool = False
     auto_sync_interval: int = 3600
@@ -112,17 +113,6 @@ class SettingsResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# CardDAV sync schema
+# CardDAV sync schema (password not needed - uses stored credentials)
 class CardDAVSync(BaseModel):
-    carddav_url: str
-    carddav_username: str
-    carddav_password: str
     clear_existing: bool = False
-    verify_ssl: bool = True
-
-# CardDAV debug schema
-class CardDAVDebug(BaseModel):
-    carddav_url: str
-    carddav_username: str
-    carddav_password: str
-    verify_ssl: bool = True

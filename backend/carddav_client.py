@@ -24,6 +24,7 @@ class CardDAVClient:
         self.verify_ssl = verify_ssl
         self.client = None
         self.principal = None
+        self.timeout = 3
 
     def connect(self):
         """Connect to CardDAV server"""
@@ -32,7 +33,6 @@ class CardDAVClient:
         logger.info(f"SSL verification: {self.verify_ssl}")
 
         try:
-            # Create DAV client
             self.client = caldav.DAVClient(
                 url=self.url,
                 username=self.username,
@@ -119,7 +119,8 @@ class CardDAVClient:
                 data=report_body,
                 headers=headers,
                 auth=auth,
-                verify=self.verify_ssl
+                verify=self.verify_ssl,
+                timeout=5
             )
 
             logger.info(f"REPORT response status: {response.status_code}")
