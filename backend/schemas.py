@@ -116,3 +116,4 @@ class SettingsResponse(BaseModel):
 # CardDAV sync schema (password not needed - uses stored credentials)
 class CardDAVSync(BaseModel):
     clear_existing: bool = False
+    bidirectional: bool = False

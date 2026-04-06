@@ -27,6 +27,7 @@ const Settings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [clearExisting, setClearExisting] = useState(false);
+  const [bidirectionalSync, setBidirectionalSync] = useState(false);
   const [verifySSL, setVerifySSL] = useState(true);
   const [debugResults, setDebugResults] = useState<any>(null);
   const [passwordInput, setPasswordInput] = useState('');
@@ -117,6 +118,7 @@ const Settings: React.FC = () => {
       setSyncing(true);
       const result = await syncCardDAV({
         clear_existing: clearExisting,
+        bidirectional: bidirectionalSync,
       });
       setSuccess(result.message);
     } catch (err: any) {
@@ -434,6 +436,17 @@ const Settings: React.FC = () => {
             <small className="form-help warning">
               Warning: This will delete all current contacts in the database
             </small>
+          </div>
+
+          <div className="form-group">
+            <label>
+              <input
+                type="checkbox"
+                checked={bidirectionalSync}
+                onChange={(e) => setBidirectionalSync(e.target.checked)}
+              />
+              Bidirectional sync (push local changes to server)
+            </label>
           </div>
 
           <button

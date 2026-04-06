@@ -79,6 +79,7 @@ export interface Settings {
 
 export interface CardDAVSync {
   clear_existing: boolean;
+  bidirectional: boolean;
 }
 
 // Contact API

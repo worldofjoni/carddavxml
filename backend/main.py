@@ -417,18 +417,71 @@ async def sync_carddav(sync_data: CardDAVSync, db: Session = Depends(get_db)):
         if sync_data.clear_existing:
             db.query(Contact).delete()
 
-        # Import contacts
+        # Import contacts from CardDAV
         imported_count = 0
+        updated_count = 0
+        
         for contact_data in contacts:
-            db_contact = Contact(**contact_data)
-            db.add(db_contact)
-            imported_count += 1
+            carddav_uid = contact_data.get('carddav_uid', '')
+            
+            if carddav_uid:
+                existing = db.query(Contact).filter(Contact.carddav_uid == carddav_uid).first()
+                if existing:
+                    for key, value in contact_data.items():
+                        setattr(existing, key, value)
+                    updated_count += 1
+                else:
+                    db_contact = Contact(**contact_data)
+                    db.add(db_contact)
+                    imported_count += 1
+            else:
+                db_contact = Contact(**contact_data)
+                db.add(db_contact)
+                imported_count += 1
 
         db.commit()
 
+        # Bidirectional sync: push local changes to CardDAV
+        pushed_count = 0
+        if sync_data.bidirectional:
+            logger.info("Starting bidirectional sync - pushing local changes to CardDAV server")
+            local_contacts = db.query(Contact).all()
+            
+            for contact in local_contacts:
+                contact_dict = {
+                    'first_name': contact.first_name,
+                    'last_name': contact.last_name,
+                    'phones': contact.phones,
+                    'emails': contact.emails,
+                    'organization': contact.organization,
+                    'address': contact.address,
+                    'website': contact.website,
+                    'notes': contact.notes,
+                    'birthday': contact.birthday,
+                    'groups': contact.groups,
+                    'carddav_uid': contact.carddav_uid,
+                }
+                
+                try:
+                    if contact.carddav_uid:
+                        run_with_timeout(client.update_contact, (contact_dict,), timeout_seconds=5)
+                    else:
+                        result = run_with_timeout(client.create_contact, (contact_dict,), timeout_seconds=5)
+                        if result and result.get('carddav_uid'):
+                            contact.carddav_uid = result['carddav_uid']
+                            db.commit()
+                    pushed_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to push contact {contact.first_name} {contact.last_name}: {e}")
+
+        message = f"Imported {imported_count}, updated {updated_count}"
+        if pushed_count > 0:
+            message += f", pushed {pushed_count} to server"
+        
         return {
-            "message": f"Successfully imported {imported_count} contacts",
-            "count": imported_count
+            "message": message,
+            "count": imported_count + updated_count,
+            "pushed": pushed_count
         }
     except HTTPException:
         raise
