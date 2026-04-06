@@ -5,11 +5,44 @@ import logging
 import requests
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 import urllib3
+import signal
+import threading
 
 logger = logging.getLogger(__name__)
 
 # Disable SSL warnings for self-signed certificates (optional)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+class TimeoutError(Exception):
+    pass
+
+
+def run_with_timeout(func, args, timeout_seconds):
+    """Run a function with a timeout using threading"""
+    result = [None]
+    error = [None]
+    finished = threading.Event()
+
+    def target():
+        try:
+            result[0] = func(*args)
+        except Exception as e:
+            error[0] = e
+        finally:
+            finished.set()
+
+    thread = threading.Thread(target=target)
+    thread.daemon = True
+    thread.start()
+    
+    if not finished.wait(timeout_seconds):
+        thread.join(timeout=1)  # Give it 1 second to cleanup
+        raise TimeoutError(f"Operation timed out after {timeout_seconds} seconds")
+    
+    if error[0]:
+        raise error[0]
+    return result[0]
 
 
 class CardDAVClient:

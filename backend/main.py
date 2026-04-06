@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import logging
 import atexit
+import threading
 
 from database import engine, Base, get_db
 from models import Contact, ContactGroup, Settings
@@ -18,6 +19,33 @@ from xml_generator import generate_grandstream_xml
 from carddav_client import CardDAVClient
 from sync_scheduler import start_scheduler, stop_scheduler, update_scheduler
 from migrations import migrate_database
+
+
+def run_with_timeout(func, args, timeout_seconds=10):
+    """Run a function with a timeout using threading"""
+    result = [None]
+    error = [None]
+    finished = threading.Event()
+
+    def target():
+        try:
+            result[0] = func(*args)
+        except Exception as e:
+            error[0] = e
+        finally:
+            finished.set()
+
+    thread = threading.Thread(target=target)
+    thread.daemon = True
+    thread.start()
+    
+    if not finished.wait(timeout_seconds):
+        thread.join(timeout=1)
+        raise TimeoutError(f"Operation timed out after {timeout_seconds} seconds")
+    
+    if error[0]:
+        raise error[0]
+    return result[0]
 
 # Run database migrations
 migrate_database()
@@ -380,7 +408,10 @@ async def sync_carddav(sync_data: CardDAVSync, db: Session = Depends(get_db)):
             verify_ssl=True
         )
 
-        contacts = client.fetch_contacts()
+        try:
+            contacts = run_with_timeout(client.fetch_contacts, (), timeout_seconds=15)
+        except TimeoutError as e:
+            raise HTTPException(status_code=504, detail=str(e))
 
         # Clear existing contacts if requested
         if sync_data.clear_existing:
@@ -434,7 +465,13 @@ async def test_carddav_connection(db: Session = Depends(get_db)):
             password=settings.carddav_password,
             verify_ssl=True
         )
-        client.connect()
+        
+        try:
+            run_with_timeout(client.connect, (), timeout_seconds=10)
+        except TimeoutError:
+            raise HTTPException(status_code=504, detail="Connection timed out after 10 seconds")
+        except Exception:
+            pass  # Let it continue to the next exception handler
 
         return {"message": "Connection successful", "status": "ok"}
     except HTTPException:
