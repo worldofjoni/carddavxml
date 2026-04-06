@@ -484,105 +484,65 @@ class CardDAVClient:
         return vcard.serialize()
 
     def create_contact(self, contact: Dict) -> Dict:
-        """Create a new contact on CardDAV server"""
-        if not self.client:
-            self.connect()
+        """Create a new contact on CardDAV server using raw HTTP"""
+        import uuid
 
-        try:
-            # Generate UID if not present
-            if not contact.get('carddav_uid'):
-                import uuid
-                contact['carddav_uid'] = str(uuid.uuid4())
+        if not contact.get('carddav_uid'):
+            contact['carddav_uid'] = str(uuid.uuid4())
 
-            # Generate vCard
-            vcard_data = self._generate_vcard(contact)
+        vcard_data = self._generate_vcard(contact)
+        uid = contact['carddav_uid']
 
-            logger.info(f"Creating contact on CardDAV server: {contact.get('first_name')} {contact.get('last_name')}")
+        logger.info(f"Creating contact on CardDAV server: {contact.get('first_name')} {contact.get('last_name')}")
 
-            # Try to get addressbook
-            import caldav.objects
-            try:
-                addressbook = caldav.objects.AddressBook(
-                    client=self.client,
-                    url=self.url
-                )
-            except Exception as e:
-                # Fallback to principal method
-                if self.principal:
-                    address_books = self.principal.addressbooks()
-                    if address_books:
-                        addressbook = address_books[0]
-                    else:
-                        raise Exception("No addressbooks found")
-                else:
-                    raise Exception(f"Could not access addressbook: {str(e)}")
+        contact_url = f"{self.url.rstrip('/')}/{uid}.vcf"
 
-            # Create the contact
-            vcard_obj = addressbook.add_vcard(vcard_data)
+        response = requests.put(
+            contact_url,
+            data=vcard_data,
+            auth=HTTPBasicAuth(self.username, self.password),
+            headers={
+                'Content-Type': 'text/vcard; charset=utf-8',
+                'If-None-Match': '*'
+            },
+            verify=self.verify_ssl,
+            timeout=10
+        )
 
-            # Get the etag from created object
-            if hasattr(vcard_obj, 'etag'):
-                contact['carddav_etag'] = vcard_obj.etag
-
-            logger.info(f"Successfully created contact with UID: {contact['carddav_uid']}")
+        if response.status_code in [201, 204]:
+            logger.info(f"Successfully created contact with UID: {uid}")
             return contact
-
-        except Exception as e:
-            logger.error(f"Failed to create contact on CardDAV server: {str(e)}")
-            raise Exception(f"Failed to create contact on CardDAV server: {str(e)}")
+        else:
+            raise Exception(f"Failed to create contact: {response.status_code} {response.text}")
 
     def update_contact(self, contact: Dict) -> Dict:
-        """Update an existing contact on CardDAV server"""
-        if not self.client:
-            self.connect()
-
+        """Update an existing contact on CardDAV server using raw HTTP"""
         if not contact.get('carddav_uid'):
             raise Exception("Cannot update contact without carddav_uid")
 
-        try:
-            logger.info(f"Updating contact on CardDAV server: {contact.get('carddav_uid')}")
+        uid = contact['carddav_uid']
+        vcard_data = self._generate_vcard(contact)
 
-            # Generate vCard
-            vcard_data = self._generate_vcard(contact)
+        logger.info(f"Updating contact on CardDAV server: {uid}")
 
-            # Get addressbook
-            import caldav.objects
-            try:
-                addressbook = caldav.objects.AddressBook(
-                    client=self.client,
-                    url=self.url
-                )
-            except Exception:
-                if self.principal:
-                    address_books = self.principal.addressbooks()
-                    if address_books:
-                        addressbook = address_books[0]
-                    else:
-                        raise Exception("No addressbooks found")
-                else:
-                    raise
+        contact_url = f"{self.url.rstrip('/')}/{uid}.vcf"
 
-            # Find and update the contact by UID
-            vcards = addressbook.search(uid=contact['carddav_uid'])
+        response = requests.put(
+            contact_url,
+            data=vcard_data,
+            auth=HTTPBasicAuth(self.username, self.password),
+            headers={
+                'Content-Type': 'text/vcard; charset=utf-8'
+            },
+            verify=self.verify_ssl,
+            timeout=10
+        )
 
-            if not vcards:
-                logger.warning(f"Contact with UID {contact['carddav_uid']} not found, creating new")
-                return self.create_contact(contact)
-
-            vcard_obj = vcards[0]
-            vcard_obj.data = vcard_data
-            vcard_obj.save()
-
-            # Update etag
-            if hasattr(vcard_obj, 'etag'):
-                contact['carddav_etag'] = vcard_obj.etag
-
-            logger.info(f"Successfully updated contact with UID: {contact['carddav_uid']}")
+        if response.status_code in [200, 201, 204]:
+            logger.info(f"Successfully updated contact with UID: {uid}")
             return contact
-
-        except Exception as e:
-            logger.error(f"Failed to update contact on CardDAV server: {str(e)}")
-            raise Exception(f"Failed to update contact on CardDAV server: {str(e)}")
+        else:
+            raise Exception(f"Failed to update contact: {response.status_code} {response.text}")
 
     def delete_contact(self, carddav_uid: str) -> bool:
         """Delete a contact from CardDAV server"""
