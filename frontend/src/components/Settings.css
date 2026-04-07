@@ -315,6 +315,39 @@
   .debug-suggestions li button {
     width: 100%;
   }
+
+  .phonebook-url-card {
+    padding: 1rem;
+  }
+
+  .sync-status-card {
+    padding: 1rem;
+  }
+
+  .sync-status-row {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .sync-status-row span {
+    text-align: left;
+  }
+
+  .instructions {
+    padding: 1rem;
+  }
+
+  .info-box {
+    padding: 1rem;
+  }
+
+  .password-input-wrapper {
+    flex-direction: column;
+  }
+
+  .password-input-wrapper button {
+    width: 100%;
+  }
 }
 
 .no-select {

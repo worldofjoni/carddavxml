@@ -314,3 +314,58 @@
 .group-info-box p:last-child {
   margin-bottom: 0;
 }
+
+@media (max-width: 768px) {
+  .group-form-card {
+    padding: 1rem;
+  }
+
+  .group-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .group-info {
+    gap: 0.5rem;
+  }
+
+  .group-name {
+    font-size: 1rem;
+  }
+
+  .group-member-count {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .group-content {
+    padding: 1rem;
+  }
+
+  .member-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .modal-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .modal-body {
+    padding: 0.75rem;
+  }
+
+  .modal-footer {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+
+  .group-info-box {
+    padding: 1rem;
+  }
+}
