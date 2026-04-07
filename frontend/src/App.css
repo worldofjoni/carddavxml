@@ -214,12 +214,8 @@
     justify-content: center;
   }
 
-  .main-content {
-    padding: 0 0.5rem;
-    margin: 1rem auto;
-  }
-
   .container {
+    max-width: 100%;
     padding: 1rem;
   }
 
