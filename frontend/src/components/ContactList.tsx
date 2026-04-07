@@ -8,6 +8,13 @@ const ContactList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'first_name' | 'last_name' | 'created'>(() => {
+    return (localStorage.getItem('contactSortBy') as 'first_name' | 'last_name' | 'created') || 'last_name';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('contactSortBy', sortBy);
+  }, [sortBy]);
 
   useEffect(() => {
     loadContacts();
@@ -39,7 +46,20 @@ const ContactList: React.FC = () => {
     }
   };
 
-  const filteredContacts = contacts.filter(contact => {
+  const sortedContacts = [...contacts].sort((a, b) => {
+    switch (sortBy) {
+      case 'first_name':
+        return (a.first_name || '').localeCompare(b.first_name || '');
+      case 'last_name':
+        return (a.last_name || '').localeCompare(b.last_name || '');
+      case 'created':
+        return (a.id || 0) - (b.id || 0);
+      default:
+        return 0;
+    }
+  });
+
+  const filteredContacts = sortedContacts.filter(contact => {
     const searchLower = searchTerm.toLowerCase();
     return (
       contact.first_name.toLowerCase().includes(searchLower) ||
@@ -74,6 +94,15 @@ const ContactList: React.FC = () => {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
         />
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as 'first_name' | 'last_name' | 'created')}
+          className="sort-select"
+        >
+          <option value="last_name">Last Name</option>
+          <option value="first_name">First Name</option>
+          <option value="created">Recently Added</option>
+        </select>
       </div>
 
       {filteredContacts.length === 0 ? (

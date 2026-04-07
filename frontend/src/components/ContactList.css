@@ -1,9 +1,11 @@
 .search-box {
+  display: flex;
+  gap: 1rem;
   margin-bottom: 2rem;
 }
 
 .search-input {
-  width: 100%;
+  flex: 1;
   padding: 0.75rem 1rem;
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -11,6 +13,20 @@
 }
 
 .search-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.sort-select {
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
+}
+
+.sort-select:focus {
   outline: none;
   border-color: #3498db;
 }
